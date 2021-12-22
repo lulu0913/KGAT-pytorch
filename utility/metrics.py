@@ -3,6 +3,17 @@ import numpy as np
 from sklearn.metrics import roc_auc_score, log_loss, mean_squared_error
 
 
+def hit_at_k(hits, k):
+    res = hits[:, :k].sum(axis=1)
+    r = []
+    for i in res:
+        if i > 0:
+            r.append(1)
+        else:
+            r.append(0)
+    return r
+
+
 def calc_recall(rank, ground_truth, k):
     """
     calculate recall of one example
@@ -121,7 +132,10 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
     """
     test_pos_item_binary = np.zeros([len(user_ids), len(item_ids)], dtype=np.float32)
     for idx, u in enumerate(user_ids):
-        train_pos_item_list = train_user_dict[u]
+        if u in train_user_dict.keys():
+            train_pos_item_list = train_user_dict[u]
+        else:
+            train_pos_item_list = []
         test_pos_item_list = test_user_dict[u]
         cf_scores[idx][train_pos_item_list] = 0
         test_pos_item_binary[idx][test_pos_item_list] = 1
@@ -140,6 +154,7 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
     precision = precision_at_k_batch(binary_hit, K)
     recall = recall_at_k_batch(binary_hit, K)
     ndcg = ndcg_at_k_batch(binary_hit, K)
-    return precision, recall, ndcg
+    HR = hit_at_k(binary_hit, K)
+    return precision, recall, ndcg, HR
 
 

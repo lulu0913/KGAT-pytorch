@@ -10,12 +10,12 @@ def parse_kgat_args():
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed.')
 
-    parser.add_argument('--data_name', nargs='?', default='last-fm',
+    parser.add_argument('--data_name', nargs='?', default='movie-MKR',
                         help='Choose a dataset from {yelp2018, last-fm, amazon-book}')
     parser.add_argument('--data_dir', nargs='?', default='datasets/',
                         help='Input data path.')
 
-    parser.add_argument('--use_pretrain', type=int, default=1,
+    parser.add_argument('--use_pretrain', type=int, default=0,
                         help='0: No pretrain, 1: Pretrain with the learned embeddings, 2: Pretrain with stored model.')
     parser.add_argument('--pretrain_embedding_dir', nargs='?', default='datasets/pretrain/',
                         help='Path of learned embeddings.')
@@ -41,12 +41,12 @@ def parse_kgat_args():
     parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for each deep layer. 0: no dropout.')
 
-    parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-5,
+    parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-3,
                         help='Lambda when calculating KG l2 loss.')
-    parser.add_argument('--cf_l2loss_lambda', type=float, default=1e-5,
+    parser.add_argument('--cf_l2loss_lambda', type=float, default=1e-4,
                         help='Lambda when calculating CF l2 loss.')
 
-    parser.add_argument('--lr', type=float, default=0.0001,
+    parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,
                         help='Number of epoch.')

@@ -35,6 +35,7 @@ def evaluate(model, train_graph, train_user_dict, test_user_dict, user_ids_batch
     precision = []
     recall = []
     ndcg = []
+    HR = []
 
     with torch.no_grad():
         for user_ids_batch in user_ids_batches:
@@ -42,18 +43,20 @@ def evaluate(model, train_graph, train_user_dict, test_user_dict, user_ids_batch
 
             cf_scores_batch = cf_scores_batch.cpu()
             user_ids_batch = user_ids_batch.cpu().numpy()
-            precision_batch, recall_batch, ndcg_batch = calc_metrics_at_k(cf_scores_batch, train_user_dict, test_user_dict, user_ids_batch, item_ids_batch, K)
+            precision_batch, recall_batch, ndcg_batch, hr_batch = calc_metrics_at_k(cf_scores_batch, train_user_dict, test_user_dict, user_ids_batch, item_ids_batch, K)
 
             cf_scores.append(cf_scores_batch.numpy())
             precision.append(precision_batch)
             recall.append(recall_batch)
             ndcg.append(ndcg_batch)
+            HR.append(hr_batch)
 
     cf_scores = np.concatenate(cf_scores, axis=0)
     precision_k = sum(np.concatenate(precision)) / n_users
     recall_k = sum(np.concatenate(recall)) / n_users
     ndcg_k = sum(np.concatenate(ndcg)) / n_users
-    return cf_scores, precision_k, recall_k, ndcg_k
+    HR_k = sum(np.concatenate(HR)) / n_users
+    return cf_scores, precision_k, recall_k, ndcg_k, HR_k
 
 
 def train(args):
@@ -111,6 +114,7 @@ def train(args):
     if use_cuda:
         train_nodes = train_nodes.to(device)
         train_edges = train_edges.to(device)
+    train_graph = train_graph.to(device)
     train_graph.ndata['id'] = train_nodes
     train_graph.edata['type'] = train_edges
 
@@ -120,6 +124,7 @@ def train(args):
     if use_cuda:
         test_nodes = test_nodes.to(device)
         test_edges = test_edges.to(device)
+    test_graph = test_graph.to(device)
     test_graph.ndata['id'] = test_nodes
     test_graph.edata['type'] = test_edges
 
@@ -129,6 +134,7 @@ def train(args):
     precision_list = []
     recall_list = []
     ndcg_list = []
+    HR_list = []
 
     # train model
     for epoch in range(1, args.n_epoch + 1):
@@ -193,13 +199,14 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
-            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
+            _, precision, recall, ndcg, HR = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
+            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f} HR {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg, HR))
 
             epoch_list.append(epoch)
             precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
+            HR_list.append(HR)
             best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
 
             if should_stop:
@@ -214,16 +221,17 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
-    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
+    _, precision, recall, ndcg, HR = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
+    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f} HR {:.4f}'.format(precision, recall, ndcg, HR))
 
     epoch_list.append(epoch)
     precision_list.append(precision)
     recall_list.append(recall)
     ndcg_list.append(ndcg)
+    HR_list.append(HR)
 
-    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
-    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
+    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list, HR_list]).transpose()
+    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K), 'HR@{}'.format(args.K)]
     metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
 
