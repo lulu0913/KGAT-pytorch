@@ -1,6 +1,8 @@
 import os
 import random
 import collections
+import pickle
+from collections import defaultdict
 
 import torch
 import numpy as np
@@ -18,8 +20,8 @@ class DataLoaderBPRMF(object):
         self.train_batch_size = args.train_batch_size
 
         data_dir = os.path.join(args.data_dir, args.data_name)
-        train_file = os.path.join(data_dir, 'train.txt')
-        test_file = os.path.join(data_dir, 'test.txt')
+        train_file = os.path.join(data_dir, 'train_data.pkl')
+        test_file = os.path.join(data_dir, 'test_data.pkl')
 
         self.cf_train_data, self.train_user_dict = self.load_cf(train_file)
         self.cf_test_data, self.test_user_dict = self.load_cf(test_file)
@@ -31,28 +33,19 @@ class DataLoaderBPRMF(object):
 
 
     def load_cf(self, filename):
-        user = []
-        item = []
-        user_dict = dict()
+        user_dict = defaultdict(list)
 
-        lines = open(filename, 'r').readlines()
-        for l in lines:
-            tmp = l.strip()
-            inter = [int(i) for i in tmp.split()]
-
-            if len(inter) > 1:
-                user_id, item_ids = inter[0], inter[1:]
-                item_ids = list(set(item_ids))
-
-                for item_id in item_ids:
-                    user.append(user_id)
-                    item.append(item_id)
-                user_dict[user_id] = item_ids
+        with open(filename, 'rb') as fo:
+            file_data = pickle.load(fo, encoding='bytes')
+        inter_mat = file_data[:, :2]
+        user = inter_mat[:, 0]
+        item = inter_mat[:, 1]
+        for u_id, i_id in inter_mat:
+            user_dict[int(u_id)].append(int(i_id))
 
         user = np.array(user, dtype=np.int32)
         item = np.array(item, dtype=np.int32)
         return (user, item), user_dict
-
 
     def statistic_cf(self):
         self.n_users = max(max(self.cf_train_data[0]), max(self.cf_test_data[0])) + 1

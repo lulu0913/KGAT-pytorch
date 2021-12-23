@@ -11,7 +11,7 @@ def hit_at_k(hits, k):
             r.append(1)
         else:
             r.append(0)
-    return r
+    return np.array(r)
 
 
 def calc_recall(rank, ground_truth, k):

@@ -59,13 +59,14 @@ def evaluate(model, dataloader, user_ids, K, use_cuda, device):
     cf_scores = cf_scores.cpu()
     user_ids = np.array(user_ids)
     item_ids = np.array(item_ids)
-    precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K)
+    precision_k, recall_k, ndcg_k, HR_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K)
 
     cf_scores = cf_scores.numpy()
     precision_k = precision_k.mean()
     recall_k = recall_k.mean()
     ndcg_k = ndcg_k.mean()
-    return cf_scores, precision_k, recall_k, ndcg_k
+    HR_k = HR_k.mean()
+    return cf_scores, precision_k, recall_k, ndcg_k, HR_k
 
 
 def train(args):
@@ -115,6 +116,7 @@ def train(args):
     precision_list = []
     recall_list = []
     ndcg_list = []
+    HR_list = []
 
     # train model
     for epoch in range(1, args.n_epoch + 1):
@@ -146,13 +148,14 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
-            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
+            _, precision, recall, ndcg, HR = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
+            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f} HR {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg, HR))
 
             epoch_list.append(epoch)
             precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
+            HR_list.append(HR)
             best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
 
             if should_stop:
@@ -167,16 +170,17 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
-    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
+    _, precision, recall, ndcg, HR = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
+    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f} HR {:.4f}'.format(precision, recall, ndcg, HR))
 
     epoch_list.append(epoch)
     precision_list.append(precision)
     recall_list.append(recall)
     ndcg_list.append(ndcg)
+    HR_list.append(HR)
 
-    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
-    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
+    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list, HR_list]).transpose()
+    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K), 'HR@{}'.format(args.K)]
     metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
 
